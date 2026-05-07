@@ -1,0 +1,20 @@
+node_modules/
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build/
+
+# Environment and credential files
+.env
+.env.local
+.env.*.local
+credentials.json
+*.pem
+*.key
+.credentials
+
+# Allow examples
+!.env.example
