@@ -3,14 +3,19 @@ import { Milk, Sprout } from 'lucide-react';
 
 const MARKET_PRESETS = {
   dairy: {
-    label: 'Dairy',
+    label: '500+ Dairy',
     icon: 'dairy',
     layers: ['500 or more Dairy Cows'],
   },
-  seed_dealers: {
-    label: 'Seed Dealers',
+  becks: {
+    label: "Beck's",
     icon: 'seed',
-    layers: ["Beck's Dealers", 'Wyffels Reps'],
+    layers: ["Beck's Dealers"],
+  },
+  wyffels: {
+    label: 'Wyffels',
+    icon: 'seed',
+    layers: ['Wyffels Reps'],
   },
 };
 
@@ -51,7 +56,7 @@ const MarketViews = ({ onMarketSelect, activeMarket }) => {
 
   return (
     <div data-testid="market-views">
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5">
         {MARKET_KEYS.map((key) => {
           const preset = MARKET_PRESETS[key];
           const isActive = activeMarket === key;
@@ -75,7 +80,7 @@ const MarketViews = ({ onMarketSelect, activeMarket }) => {
           );
         })}
         {activeMarket === 'custom' && (
-          <div className="col-span-2 flex flex-col items-center justify-center py-2 px-1.5 rounded-lg border border-dashed border-stone-300 text-xs text-stone-400">
+          <div className="col-span-3 flex flex-col items-center justify-center py-2 px-1.5 rounded-lg border border-dashed border-stone-300 text-xs text-stone-400">
             <span className="text-[10px]">Custom</span>
           </div>
         )}
