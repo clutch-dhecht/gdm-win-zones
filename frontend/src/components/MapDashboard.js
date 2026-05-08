@@ -52,7 +52,12 @@ const MapDashboard = ({ apiUrl }) => {
     allLayers.forEach(l => { newActive[l] = false; });
     if (marketKey && marketKey !== 'custom') {
       const preset = getMarketPreset(marketKey);
-      if (preset) preset.layers.forEach(l => { newActive[l] = true; });
+      if (preset) {
+        preset.layers.forEach(l => { newActive[l] = true; });
+        setSelectedStates(preset.states && preset.states.length > 0 ? preset.states : null);
+      }
+    } else {
+      setSelectedStates(null);
     }
     setActiveLayers(newActive);
   };

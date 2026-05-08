@@ -75,6 +75,15 @@ export const LAYER_CONFIG = {
     fillOpacity: 0.75,
     order: 56,
   },
+
+  // --- CORN ACRES (county density) ---
+  "Corn Acres": {
+    type: "density",
+    radius: { enabled: false },
+    color: "#EAB308",
+    fillOpacity: 0.6,
+    order: 60,
+  },
 };
 
 // Layer groups for sub-filter UI

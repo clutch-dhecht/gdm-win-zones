@@ -119,6 +119,7 @@ async def seed_all(db):
         await _seed_becks(db, existing_point_layers)
         await _seed_wyffels(db, existing_point_layers)
         await _seed_dairy_cows(db)
+        await _seed_corn_acres(db)
 
         logger.info("Seed check complete")
     except Exception as e:
@@ -275,3 +276,43 @@ async def _seed_dairy_cows(db):
     if merged:
         await db.density_data.insert_many(merged)
     logger.info(f"Seeded Dairy Cows into {len(rows_by_key)} counties (total density rows: {len(merged)})")
+
+
+async def _seed_corn_acres(db):
+    """Seed 'Corn Acres' density layer from Corn-USDA.csv."""
+    layer_name = 'Corn Acres'
+    existing = await db.density_data.count_documents({f'layers.{layer_name}': {'$exists': True, '$gt': 0}})
+    if existing >= 500:
+        logger.info(f"{layer_name} already seeded ({existing} counties) — skipping")
+        return
+
+    csv_path = SEED_DIR / 'Corn-USDA.csv'
+    if not csv_path.exists():
+        logger.warning(f"Corn seed file missing: {csv_path}")
+        return
+    logger.info(f"Seeding {layer_name}...")
+    df = pd.read_csv(csv_path)
+    df['State'] = df['State'].astype(str).str.strip().str.title()
+    df['County'] = df['County'].astype(str).str.strip().str.upper()
+    val_col = next((c for c in df.columns if 'CORN' in c.upper() and 'ACRES' in c.upper()), None)
+    if not val_col:
+        logger.error("Corn CSV missing acres column")
+        return
+    df[val_col] = pd.to_numeric(df[val_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0).astype(int)
+    grouped = df.groupby(['State', 'County'])[val_col].sum().reset_index()
+
+    existing_docs = await db.density_data.find({}, {"_id": 0}).to_list(50000)
+    lookup = {(doc['state'], doc['county']): doc for doc in existing_docs}
+    for _, row in grouped.iterrows():
+        key = (row['State'], row['County'])
+        value = int(row[val_col])
+        if key in lookup:
+            lookup[key]['layers'][layer_name] = value
+        else:
+            lookup[key] = {'state': key[0], 'county': key[1], 'layers': {layer_name: value}}
+
+    merged = list(lookup.values())
+    await db.density_data.delete_many({})
+    if merged:
+        await db.density_data.insert_many(merged)
+    logger.info(f"Seeded {layer_name} into {len(grouped)} counties (total density rows: {len(merged)})")
