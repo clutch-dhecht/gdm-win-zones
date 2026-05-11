@@ -76,13 +76,20 @@ export const LAYER_CONFIG = {
     order: 56,
   },
 
-  // --- CORN ACRES (county density) ---
+  // --- CORN ACRES (county density, restricted to 18 corn-region states) ---
   "Corn Acres": {
     type: "density",
     radius: { enabled: false },
-    color: "#EAB308",
+    color: "#16A34A",
     fillOpacity: 0.6,
     order: 60,
+    availableStates: [
+      'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
+      'Iowa', 'Nebraska', 'Missouri', 'Indiana',
+      'Illinois', 'Ohio', 'Michigan', 'Kansas',
+      'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
+      'Pennsylvania', 'Maryland',
+    ],
   },
 };
 

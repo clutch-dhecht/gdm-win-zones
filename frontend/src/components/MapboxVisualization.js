@@ -304,6 +304,7 @@ const MapboxVisualization = ({
       Object.keys(county.layers).forEach(layer => {
         const config = getLayerConfig(layer);
         if (config.type !== 'density' && config.type !== 'base') return;
+        if (config.availableStates && !config.availableStates.includes(state)) return;
         const value = county.layers[layer] || 0;
         if (value > 0) dataLookup[key][layer] = (dataLookup[key][layer] || 0) + value;
       });

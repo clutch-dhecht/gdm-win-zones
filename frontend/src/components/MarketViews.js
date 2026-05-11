@@ -1,15 +1,6 @@
 import React from 'react';
 import { Milk, Wheat } from 'lucide-react';
 
-const CORN_BELT_STATES = [
-  'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
-  'Iowa', 'Nebraska', 'Missouri', 'Indiana',
-  'Illinois', 'Ohio', 'Michigan', 'Kansas',
-  // Extended for full Beck's coverage
-  'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
-  'Pennsylvania', 'Maryland',
-];
-
 const MARKET_PRESETS = {
   dairy: {
     label: '500+ Dairy',
@@ -21,7 +12,7 @@ const MARKET_PRESETS = {
     label: 'Corn',
     icon: 'corn',
     layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres'],
-    states: CORN_BELT_STATES,
+    states: null,
   },
 };
 
