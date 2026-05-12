@@ -724,16 +724,15 @@ const MapboxVisualization = ({
                   const cfg = getLayerConfig(layer);
                   const ramp = cfg.colorRamp;
                   const baseOpacity = cfg.fillOpacity ?? 0.85;
-                  // Build an N-stop interpolation expression from the ramp.
-                  // Stops are evenly distributed across [0, 1] so all ramp colors
-                  // contribute, giving richer mid-range variation.
+                  // Decile-banded step expression: each color covers one tier
+                  // of the percentile-rank intensity (e.g. 10 colors → 10% bands).
+                  // Format: ['step', input, defaultColor, thresh1, color1, thresh2, color2, ...]
                   const fillColor = ramp && ramp.length >= 2
                     ? (() => {
-                        const expr = ['interpolate', ['linear'], ['coalesce', ['get', `int_${slug}`], 0]];
-                        ramp.forEach((c, i) => {
-                          const stop = ramp.length === 1 ? 0 : i / (ramp.length - 1);
-                          expr.push(stop, c);
-                        });
+                        const expr = ['step', ['coalesce', ['get', `int_${slug}`], 0], ramp[0]];
+                        for (let i = 1; i < ramp.length; i++) {
+                          expr.push(i / ramp.length, ramp[i]);
+                        }
                         return expr;
                       })()
                     : getDensityColor(layer, layerColors);

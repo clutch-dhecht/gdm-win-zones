@@ -1,12 +1,34 @@
 // Layer configuration for GDM Win Zones
 // Edit this file to add/remove layers, change colors, enable/disable radius
 
-// Dairy ramp: pale → sky → bright → royal → deep navy
-const DAIRY_RAMP = ['#DBEAFE', '#7DD3FC', '#0EA5E9', '#1D4ED8', '#0A2540'];
-// Corn ramp: warm white → soft yellow → soft lime → green → dark forest
-// Low end fades toward white so the lightest counties read as "near empty"
-// and the bright yellow has more breathing room mid-low.
-const CORN_RAMP = ['#FFFBEB', '#FEF08A', '#BEF264', '#65A30D', '#14532D'];
+// Hex linear interpolation helper
+const lerpHex = (a, b, t) => {
+  const ai = parseInt(a.slice(1), 16);
+  const bi = parseInt(b.slice(1), 16);
+  const r = Math.round(((ai >> 16) & 0xff) * (1 - t) + ((bi >> 16) & 0xff) * t);
+  const g = Math.round(((ai >> 8) & 0xff) * (1 - t) + ((bi >> 8) & 0xff) * t);
+  const bl = Math.round((ai & 0xff) * (1 - t) + (bi & 0xff) * t);
+  return '#' + ((r << 16) | (g << 8) | bl).toString(16).padStart(6, '0').toUpperCase();
+};
+
+// Expand a set of anchor stops into N evenly-spaced colors via piecewise linear interp.
+const expandRamp = (stops, n) => {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0 : i / (n - 1);
+    const pos = t * (stops.length - 1);
+    const lo = Math.floor(pos);
+    const hi = Math.min(lo + 1, stops.length - 1);
+    out.push(lerpHex(stops[lo], stops[hi], pos - lo));
+  }
+  return out;
+};
+
+// 10-band decile ramps (one color per percentile-rank tier).
+// Dairy: pale → sky → bright → royal → deep navy
+const DAIRY_RAMP = expandRamp(['#DBEAFE', '#7DD3FC', '#0EA5E9', '#1D4ED8', '#0A2540'], 10);
+// Corn: warm white → soft yellow → soft lime → green → dark forest
+const CORN_RAMP = expandRamp(['#FFFBEB', '#FEF08A', '#BEF264', '#65A30D', '#14532D'], 10);
 
 export const LAYER_CONFIG = {
   // --- POINT LAYERS ---
