@@ -14,27 +14,29 @@ const formatStat = (value) => {
 // First match wins (used to pick which underlying layer's value to show).
 const CORN_LAYER_PRIORITY = ['Corn Acres All States', 'Corn Acres Corn Belt States'];
 
-const LayerStats = ({ activeLayers, allLayers = [], pointData, locationData, densityData, onToggle }) => {
+const LayerStats = ({ activeLayers, allLayers = [], pointData, locationData, densityData, onToggle, activeMarket }) => {
   const stats = useMemo(() => {
     const result = [];
 
     // 1. Point layers (Beck's Dealers, Wyffels Reps, etc.)
     //    Always show — even when toggled off — so the user can click to enable.
-    //    Count reflects the *filtered* locationData (state filter applied).
-    const pointLayerNames = allLayers.filter(l => getLayerConfig(l).type === 'point');
-    const locationCounts = {};
-    (locationData || []).forEach(loc => {
-      locationCounts[loc.layer] = (locationCounts[loc.layer] || 0) + 1;
-    });
-    pointLayerNames.forEach(layer => {
-      result.push({
-        layer,
-        value: locationCounts[layer] || 0,
-        kind: 'point',
-        active: !!activeLayers[layer],
-        clickable: true,
+    //    Hidden when on the Dairy preset (point layers aren't relevant there).
+    if (activeMarket !== 'dairy') {
+      const pointLayerNames = allLayers.filter(l => getLayerConfig(l).type === 'point');
+      const locationCounts = {};
+      (locationData || []).forEach(loc => {
+        locationCounts[loc.layer] = (locationCounts[loc.layer] || 0) + 1;
       });
-    });
+      pointLayerNames.forEach(layer => {
+        result.push({
+          layer,
+          value: locationCounts[layer] || 0,
+          kind: 'point',
+          active: !!activeLayers[layer],
+          clickable: true,
+        });
+      });
+    }
 
     // 2. Aggregated point layers (legacy CLS Customers etc.) — sum across active
     const aggTotals = {};
@@ -69,7 +71,7 @@ const LayerStats = ({ activeLayers, allLayers = [], pointData, locationData, den
     });
 
     return result;
-  }, [activeLayers, allLayers, pointData, locationData, densityData]);
+  }, [activeLayers, allLayers, pointData, locationData, densityData, activeMarket]);
 
   if (stats.length === 0) return null;
 

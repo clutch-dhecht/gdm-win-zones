@@ -219,6 +219,7 @@ const MapDashboard = ({ apiUrl }) => {
             locationData={filteredLocationData}
             densityData={filteredDensityData}
             onToggle={toggleLayer}
+            activeMarket={activeMarket}
           />
         </div>
       )}

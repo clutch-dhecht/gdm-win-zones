@@ -313,17 +313,36 @@ const MapboxVisualization = ({
       });
     });
 
-    // Compute per-layer min/max across whatever's currently in dataLookup
-    // (already filtered by state filter + corn sub-filter at the parent level).
-    // Used for linear min-max stretch normalization so the full color ramp
-    // spans the visible spread, no matter how narrow.
-    const layerMaxes = {};
-    const layerMins = {};
+    // Build sorted value arrays per layer for percentile-rank normalization.
+    // Percentile-rank distributes counties evenly across the color ramp based
+    // on relative rank (not raw value), so outliers (e.g. Tulare County dairy)
+    // can't crush everyone else into the pale end of the gradient.
+    const sortedByLayer = {};
     Object.values(dataLookup).forEach(layers => {
       Object.entries(layers).forEach(([l, v]) => {
-        if (layerMaxes[l] === undefined || v > layerMaxes[l]) layerMaxes[l] = v;
-        if (layerMins[l] === undefined || v < layerMins[l]) layerMins[l] = v;
+        if (!sortedByLayer[l]) sortedByLayer[l] = [];
+        sortedByLayer[l].push(v);
       });
+    });
+    Object.keys(sortedByLayer).forEach(l => sortedByLayer[l].sort((a, b) => a - b));
+
+    // Binary search for the first index >= value → percentile rank in [0, 1]
+    const percentileRank = (value, sorted) => {
+      if (!sorted || sorted.length === 0) return 0;
+      if (sorted.length === 1) return 1.0;
+      let lo = 0, hi = sorted.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid] < value) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo / (sorted.length - 1);
+    };
+
+    // Keep linear max for win-zone math (separate from coloring).
+    const layerMaxes = {};
+    Object.entries(sortedByLayer).forEach(([l, vals]) => {
+      layerMaxes[l] = vals[vals.length - 1];
     });
 
     const enrichedFeatures = countiesGeoJSON.features.map(feature => {
@@ -339,13 +358,9 @@ const MapboxVisualization = ({
 
       Object.entries(countyLayers).forEach(([layer, value]) => {
         const slug = slugify(layer);
-        const max = layerMaxes[layer] ?? 1;
-        const min = layerMins[layer] ?? 0;
-        const range = max - min;
-        // Linear min-max stretch within visible data — gives true contrast even
-        // when all visible counties share an order of magnitude (e.g. Iowa corn).
-        // Falls back to 1.0 if all visible counties have identical values.
-        let intensity = range > 0 ? (value - min) / range : 1.0;
+        // Percentile-rank intensity — outlier-resistant, evenly distributes
+        // counties across the full ramp.
+        let intensity = percentileRank(value, sortedByLayer[layer]);
         intensity = Math.max(0.05, Math.min(1.0, intensity));
         extraProps[`val_${slug}`] = value;
         extraProps[`int_${slug}`] = intensity;
