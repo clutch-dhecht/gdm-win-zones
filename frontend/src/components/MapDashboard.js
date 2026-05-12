@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import FileUpload from './FileUpload';
 import MapboxVisualization from './MapboxVisualization';
@@ -168,21 +168,34 @@ const MapDashboard = ({ apiUrl }) => {
     return selectedStates.includes(normalized);
   };
 
-  const filteredPointData = selectedStates ? pointData.filter(d => matchesStateFilter(d.state)) : pointData;
-  const filteredLocationData = selectedStates ? locationData.filter(d => matchesStateFilter(d.state)) : locationData;
-  const stateFilteredDensityData = selectedStates ? densityData.filter(d => matchesStateFilter(d.state)) : densityData;
+  const filteredPointData = useMemo(
+    () => (selectedStates ? pointData.filter(d => matchesStateFilter(d.state)) : pointData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedStates, pointData]
+  );
+  const filteredLocationData = useMemo(
+    () => (selectedStates ? locationData.filter(d => matchesStateFilter(d.state)) : locationData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedStates, locationData]
+  );
+  const stateFilteredDensityData = useMemo(
+    () => (selectedStates ? densityData.filter(d => matchesStateFilter(d.state)) : densityData),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedStates, densityData]
+  );
 
   // Apply Corn Acres sub-filter (Key Markets / All States): in 'key' mode,
   // strip the "Corn Acres" value out of any county whose state isn't in CORN_KEY_STATES.
-  const filteredDensityData = (cornFilter === 'all')
-    ? stateFilteredDensityData
-    : stateFilteredDensityData.map(d => {
-        if (!d.layers || !('Corn Acres' in d.layers)) return d;
-        const normalized = d.state && d.state.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-        if (CORN_KEY_STATES.includes(normalized)) return d;
-        const { 'Corn Acres': _omit, ...rest } = d.layers;
-        return { ...d, layers: rest };
-      });
+  const filteredDensityData = useMemo(() => {
+    if (cornFilter === 'all') return stateFilteredDensityData;
+    return stateFilteredDensityData.map(d => {
+      if (!d.layers || !('Corn Acres' in d.layers)) return d;
+      const normalized = d.state && d.state.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      if (CORN_KEY_STATES.includes(normalized)) return d;
+      const { 'Corn Acres': _omit, ...rest } = d.layers;
+      return { ...d, layers: rest };
+    });
+  }, [cornFilter, stateFilteredDensityData]);
 
   const sidebarContent = (
     <>
