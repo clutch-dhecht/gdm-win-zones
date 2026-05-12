@@ -310,9 +310,17 @@ const MapboxVisualization = ({
       });
     });
 
+    // Compute per-layer min/max across whatever's currently in dataLookup
+    // (already filtered by state filter + corn sub-filter at the parent level).
+    // Used for linear min-max stretch normalization so the full color ramp
+    // spans the visible spread, no matter how narrow.
     const layerMaxes = {};
+    const layerMins = {};
     Object.values(dataLookup).forEach(layers => {
-      Object.entries(layers).forEach(([l, v]) => { if (!layerMaxes[l] || v > layerMaxes[l]) layerMaxes[l] = v; });
+      Object.entries(layers).forEach(([l, v]) => {
+        if (layerMaxes[l] === undefined || v > layerMaxes[l]) layerMaxes[l] = v;
+        if (layerMins[l] === undefined || v < layerMins[l]) layerMins[l] = v;
+      });
     });
 
     const enrichedFeatures = countiesGeoJSON.features.map(feature => {
@@ -328,10 +336,13 @@ const MapboxVisualization = ({
 
       Object.entries(countyLayers).forEach(([layer, value]) => {
         const slug = slugify(layer);
-        const max = layerMaxes[layer] || 1;
-        const logMax = Math.log(max + 1);
-        // Sharper contrast: full 0.05–1.0 spread (was 0.2–0.8)
-        let intensity = Math.log(value + 1) / logMax;
+        const max = layerMaxes[layer] ?? 1;
+        const min = layerMins[layer] ?? 0;
+        const range = max - min;
+        // Linear min-max stretch within visible data — gives true contrast even
+        // when all visible counties share an order of magnitude (e.g. Iowa corn).
+        // Falls back to 1.0 if all visible counties have identical values.
+        let intensity = range > 0 ? (value - min) / range : 1.0;
         intensity = Math.max(0.05, Math.min(1.0, intensity));
         extraProps[`val_${slug}`] = value;
         extraProps[`int_${slug}`] = intensity;

@@ -211,37 +211,6 @@ const MapDashboard = ({ apiUrl }) => {
         </div>
       )}
 
-      {/* Corn Acres sub-filter (Key Markets / All States) */}
-      {hasData && activeLayers['Corn Acres'] && (
-        <div className="px-4 py-2 border-b border-stone-100">
-          <label className="text-[10px] tracking-[0.08em] uppercase font-semibold text-stone-400 block mb-1.5">Corn Acres Region</label>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setCornFilter('key')}
-              className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
-                cornFilter === 'key'
-                  ? 'bg-[#0A2540] text-white'
-                  : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-              }`}
-              data-testid="corn-filter-key"
-            >
-              Key Markets
-            </button>
-            <button
-              onClick={() => setCornFilter('all')}
-              className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
-                cornFilter === 'all'
-                  ? 'bg-[#0A2540] text-white'
-                  : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-              }`}
-              data-testid="corn-filter-all"
-            >
-              All States
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* State Filter */}
       {hasData && (
         <div className="px-4 py-2 border-b border-stone-100">
@@ -357,6 +326,35 @@ const MapDashboard = ({ apiUrl }) => {
                 <FileUpload onPointUpload={handlePointUpload} onDensityUpload={handleDensityUpload} loading={loading} />
               </div>
               <LayerControls allLayers={allLayers} activeLayers={activeLayers} onToggle={toggleLayer} radiusSettings={radiusSettings} onRadiusChange={handleRadiusChange} layerColors={layerColors} onColorChange={handleColorChange} />
+              {activeLayers['Corn Acres'] && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                  <label className="text-[10px] tracking-[0.08em] uppercase font-semibold text-stone-400 block mb-1.5">Corn Acres Region</label>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setCornFilter('key')}
+                      className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
+                        cornFilter === 'key'
+                          ? 'bg-[#0A2540] text-white'
+                          : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                      }`}
+                      data-testid="corn-filter-key"
+                    >
+                      Key Markets
+                    </button>
+                    <button
+                      onClick={() => setCornFilter('all')}
+                      className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
+                        cornFilter === 'all'
+                          ? 'bg-[#0A2540] text-white'
+                          : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                      }`}
+                      data-testid="corn-filter-all"
+                    >
+                      All States
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
