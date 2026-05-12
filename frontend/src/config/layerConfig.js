@@ -1,15 +1,6 @@
 // Layer configuration for GDM Win Zones
 // Edit this file to add/remove layers, change colors, enable/disable radius
 
-// 18 states where Corn Acres is shown by default ("Key Markets" sub-filter)
-export const CORN_KEY_STATES = [
-  'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
-  'Iowa', 'Nebraska', 'Missouri', 'Indiana',
-  'Illinois', 'Ohio', 'Michigan', 'Kansas',
-  'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
-  'Pennsylvania', 'Maryland',
-];
-
 // Dairy ramp: light blue → mid blue → deep navy
 const DAIRY_RAMP = ['#DBEAFE', '#3B82F6', '#0A2540'];
 // Corn ramp: light yellow → lime → dark forest
@@ -92,15 +83,22 @@ export const LAYER_CONFIG = {
   },
 
   // --- CORN ACRES (county density) ---
-  // Geo-restriction is now controlled by the "Corn Acres" sub-filter
-  // ("Key Markets" vs "All States"), wired through MapDashboard state.
-  "Corn Acres": {
+  // Backend seeds two separate layers — toggle independently.
+  "Corn Acres Corn Belt States": {
     type: "density",
     radius: { enabled: false },
     color: "#14532D",
     fillOpacity: 0.85,
     colorRamp: CORN_RAMP,
     order: 60,
+  },
+  "Corn Acres All States": {
+    type: "density",
+    radius: { enabled: false },
+    color: "#14532D",
+    fillOpacity: 0.85,
+    colorRamp: CORN_RAMP,
+    order: 61,
   },
 };
 

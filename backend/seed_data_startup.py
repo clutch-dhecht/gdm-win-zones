@@ -278,19 +278,44 @@ async def _seed_dairy_cows(db):
     logger.info(f"Seeded Dairy Cows into {len(rows_by_key)} counties (total density rows: {len(merged)})")
 
 
+CORN_BELT_STATES = {
+    'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
+    'Iowa', 'Nebraska', 'Missouri', 'Indiana',
+    'Illinois', 'Ohio', 'Michigan', 'Kansas',
+    'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
+    'Pennsylvania', 'Maryland',
+}
+
+
 async def _seed_corn_acres(db):
-    """Seed 'Corn Acres' density layer from Corn-USDA.csv."""
-    layer_name = 'Corn Acres'
-    existing = await db.density_data.count_documents({f'layers.{layer_name}': {'$exists': True, '$gt': 0}})
-    if existing >= 500:
-        logger.info(f"{layer_name} already seeded ({existing} counties) — skipping")
+    """Seed two Corn Acres density layers from Corn-USDA.csv:
+    - 'Corn Acres All States' (nationwide)
+    - 'Corn Acres Corn Belt States' (18-state subset)
+    """
+    all_layer = 'Corn Acres All States'
+    belt_layer = 'Corn Acres Corn Belt States'
+    target_layers = {all_layer, belt_layer}
+
+    existing = await db.density_data.aggregate([
+        {'$project': {'layers': {'$objectToArray': '$layers'}}},
+        {'$unwind': '$layers'},
+        {'$group': {'_id': '$layers.k'}},
+    ]).to_list(1000)
+    existing_layer_names = {d['_id'] for d in existing}
+    if target_layers.issubset(existing_layer_names):
+        logger.info("Corn Acres layers already present — skipping seed")
         return
+
+    # Migration: clear legacy single 'Corn Acres' layer (now split into two)
+    if 'Corn Acres' in existing_layer_names:
+        logger.info("Migrating legacy 'Corn Acres' layer — splitting into All States + Corn Belt States")
+        await db.density_data.update_many({}, {'$unset': {'layers.Corn Acres': ''}})
 
     csv_path = SEED_DIR / 'Corn-USDA.csv'
     if not csv_path.exists():
         logger.warning(f"Corn seed file missing: {csv_path}")
         return
-    logger.info(f"Seeding {layer_name}...")
+    logger.info("Seeding Corn Acres (All States + Corn Belt States)...")
     df = pd.read_csv(csv_path)
     df['State'] = df['State'].astype(str).str.strip().str.title()
     df['County'] = df['County'].astype(str).str.strip().str.upper()
@@ -303,16 +328,19 @@ async def _seed_corn_acres(db):
 
     existing_docs = await db.density_data.find({}, {"_id": 0}).to_list(50000)
     lookup = {(doc['state'], doc['county']): doc for doc in existing_docs}
+    belt_count = 0
     for _, row in grouped.iterrows():
         key = (row['State'], row['County'])
         value = int(row[val_col])
-        if key in lookup:
-            lookup[key]['layers'][layer_name] = value
-        else:
-            lookup[key] = {'state': key[0], 'county': key[1], 'layers': {layer_name: value}}
+        if key not in lookup:
+            lookup[key] = {'state': key[0], 'county': key[1], 'layers': {}}
+        lookup[key]['layers'][all_layer] = value
+        if key[0] in CORN_BELT_STATES:
+            lookup[key]['layers'][belt_layer] = value
+            belt_count += 1
 
     merged = list(lookup.values())
     await db.density_data.delete_many({})
     if merged:
         await db.density_data.insert_many(merged)
-    logger.info(f"Seeded {layer_name} into {len(grouped)} counties (total density rows: {len(merged)})")
+    logger.info(f"Seeded Corn Acres: {len(grouped)} counties total, {belt_count} in corn belt (density rows: {len(merged)})")

@@ -846,10 +846,10 @@ const MapboxVisualization = ({
             {locationGeoJSON && (
               <Source id="location-source" type="geojson" data={locationGeoJSON}>
                 <Layer id="location-points-unclustered" type="circle" paint={{
-                  'circle-radius': 7,
+                  'circle-radius': 5,
                   'circle-color': locationColorExpr,
                   'circle-opacity': 1,
-                  'circle-stroke-width': 2,
+                  'circle-stroke-width': 1.5,
                   'circle-stroke-color': '#FFFFFF'
                 }} />
               </Source>
@@ -859,10 +859,10 @@ const MapboxVisualization = ({
             {cityMarkersGeoJSON && (
               <Source id="city-markers-source" type="geojson" data={cityMarkersGeoJSON}>
                 <Layer id="city-markers-unclustered" type="circle" paint={{
-                  'circle-radius': ['interpolate', ['linear'], ['get', 'value'], 0, 7, 10, 9, 50, 12, 200, 16],
+                  'circle-radius': ['interpolate', ['linear'], ['get', 'value'], 0, 5, 10, 7, 50, 10, 200, 13],
                   'circle-color': locationColorExpr,
                   'circle-opacity': 1,
-                  'circle-stroke-width': 2.5, 'circle-stroke-color': '#FFFFFF'
+                  'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF'
                 }} />
               </Source>
             )}

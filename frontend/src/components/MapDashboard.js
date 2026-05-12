@@ -8,7 +8,7 @@ import LayerStats from './LayerStats';
 import StateFilter from './StateFilter';
 import WinZoneCards from './WinZoneCards';
 import { toast } from 'sonner';
-import { getLayerConfig, CORN_KEY_STATES } from '../config/layerConfig';
+import { getLayerConfig } from '../config/layerConfig';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
@@ -30,7 +30,6 @@ const MapDashboard = ({ apiUrl }) => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [cornFilter, setCornFilter] = useState('key'); // 'key' | 'all'
   const [showZoneFocus, setShowZoneFocus] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mapZoomRef = useRef(null);
@@ -178,24 +177,11 @@ const MapDashboard = ({ apiUrl }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedStates, locationData]
   );
-  const stateFilteredDensityData = useMemo(
+  const filteredDensityData = useMemo(
     () => (selectedStates ? densityData.filter(d => matchesStateFilter(d.state)) : densityData),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedStates, densityData]
   );
-
-  // Apply Corn Acres sub-filter (Key Markets / All States): in 'key' mode,
-  // strip the "Corn Acres" value out of any county whose state isn't in CORN_KEY_STATES.
-  const filteredDensityData = useMemo(() => {
-    if (cornFilter === 'all') return stateFilteredDensityData;
-    return stateFilteredDensityData.map(d => {
-      if (!d.layers || !('Corn Acres' in d.layers)) return d;
-      const normalized = d.state && d.state.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      if (CORN_KEY_STATES.includes(normalized)) return d;
-      const { 'Corn Acres': _omit, ...rest } = d.layers;
-      return { ...d, layers: rest };
-    });
-  }, [cornFilter, stateFilteredDensityData]);
 
   const sidebarContent = (
     <>
@@ -326,35 +312,6 @@ const MapDashboard = ({ apiUrl }) => {
                 <FileUpload onPointUpload={handlePointUpload} onDensityUpload={handleDensityUpload} loading={loading} />
               </div>
               <LayerControls allLayers={allLayers} activeLayers={activeLayers} onToggle={toggleLayer} radiusSettings={radiusSettings} onRadiusChange={handleRadiusChange} layerColors={layerColors} onColorChange={handleColorChange} />
-              {activeLayers['Corn Acres'] && (
-                <div className="mt-3 pt-3 border-t border-stone-100">
-                  <label className="text-[10px] tracking-[0.08em] uppercase font-semibold text-stone-400 block mb-1.5">Corn Acres Region</label>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setCornFilter('key')}
-                      className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
-                        cornFilter === 'key'
-                          ? 'bg-[#0A2540] text-white'
-                          : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                      }`}
-                      data-testid="corn-filter-key"
-                    >
-                      Key Markets
-                    </button>
-                    <button
-                      onClick={() => setCornFilter('all')}
-                      className={`flex-1 text-[11px] px-2 py-1.5 rounded transition-colors ${
-                        cornFilter === 'all'
-                          ? 'bg-[#0A2540] text-white'
-                          : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                      }`}
-                      data-testid="corn-filter-all"
-                    >
-                      All States
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

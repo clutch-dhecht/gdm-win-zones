@@ -11,7 +11,7 @@ const MARKET_PRESETS = {
   corn: {
     label: 'Corn',
     icon: 'corn',
-    layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres'],
+    layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres Corn Belt States'],
     states: null,
   },
 };
