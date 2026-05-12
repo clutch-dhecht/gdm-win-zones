@@ -34,6 +34,9 @@ const normalizeCountyName = (name) => {
   n = n.replace(/\./g, '').replace(/'/g, '').replace(/\u00D1/g, 'N').replace(/\u00F1/g, 'N');
   n = n.replace(/^DE /, 'DE').replace(/^LA /, 'LA').replace(/^LE /, 'LE');
   n = n.replace(/-/g, ' ');
+  // USDA encodes apostrophe counties as "O BRIEN" \u2014 collapse single-letter prefix + space.
+  // Maps both "O BRIEN" and "O'BRIEN" to "OBRIEN" so the join works for either form.
+  n = n.replace(/^([A-Z]) /, '$1');
   return n;
 };
 
@@ -843,10 +846,10 @@ const MapboxVisualization = ({
             {locationGeoJSON && (
               <Source id="location-source" type="geojson" data={locationGeoJSON}>
                 <Layer id="location-points-unclustered" type="circle" paint={{
-                  'circle-radius': 5,
+                  'circle-radius': 7,
                   'circle-color': locationColorExpr,
-                  'circle-opacity': 0.9,
-                  'circle-stroke-width': 1.5,
+                  'circle-opacity': 1,
+                  'circle-stroke-width': 2,
                   'circle-stroke-color': '#FFFFFF'
                 }} />
               </Source>
@@ -856,10 +859,10 @@ const MapboxVisualization = ({
             {cityMarkersGeoJSON && (
               <Source id="city-markers-source" type="geojson" data={cityMarkersGeoJSON}>
                 <Layer id="city-markers-unclustered" type="circle" paint={{
-                  'circle-radius': ['interpolate', ['linear'], ['get', 'value'], 0, 5, 10, 7, 50, 10, 200, 14],
+                  'circle-radius': ['interpolate', ['linear'], ['get', 'value'], 0, 7, 10, 9, 50, 12, 200, 16],
                   'circle-color': locationColorExpr,
-                  'circle-opacity': 0.85,
-                  'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF'
+                  'circle-opacity': 1,
+                  'circle-stroke-width': 2.5, 'circle-stroke-color': '#FFFFFF'
                 }} />
               </Source>
             )}
