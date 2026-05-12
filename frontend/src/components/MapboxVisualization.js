@@ -441,6 +441,24 @@ const MapboxVisualization = ({
     if (onMapZoom) onMapZoom(zoomToBbox);
   }, [onMapZoom, zoomToBbox]);
 
+  // Force point layers to render above the choropleth and any other overlays.
+  // Mapbox layer order depends on insertion sequence; whenever the layer set
+  // changes (new fill added, etc.) we re-hoist the dot layers to the top.
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    const hoist = () => {
+      ['location-points-unclustered', 'city-markers-unclustered'].forEach(id => {
+        if (map.getLayer(id)) {
+          try { map.moveLayer(id); } catch (_) { /* layer might be transitioning */ }
+        }
+      });
+    };
+    hoist();
+    map.on('styledata', hoist);
+    return () => { map.off('styledata', hoist); };
+  }, [activeLayers, winZonesEnabled, locationGeoJSON, cityMarkersGeoJSON]);
+
   // Also handle state filter zoom
   useEffect(() => {
     if (!selectedStates || selectedStates.length === 0 || !enrichedCountiesGeoJSON) return;
@@ -691,11 +709,18 @@ const MapboxVisualization = ({
                   const cfg = getLayerConfig(layer);
                   const ramp = cfg.colorRamp;
                   const baseOpacity = cfg.fillOpacity ?? 0.85;
+                  // Build an N-stop interpolation expression from the ramp.
+                  // Stops are evenly distributed across [0, 1] so all ramp colors
+                  // contribute, giving richer mid-range variation.
                   const fillColor = ramp && ramp.length >= 2
-                    ? ['interpolate', ['linear'], ['coalesce', ['get', `int_${slug}`], 0],
-                       0, ramp[0],
-                       0.5, ramp[Math.floor(ramp.length / 2)],
-                       1, ramp[ramp.length - 1]]
+                    ? (() => {
+                        const expr = ['interpolate', ['linear'], ['coalesce', ['get', `int_${slug}`], 0]];
+                        ramp.forEach((c, i) => {
+                          const stop = ramp.length === 1 ? 0 : i / (ramp.length - 1);
+                          expr.push(stop, c);
+                        });
+                        return expr;
+                      })()
                     : getDensityColor(layer, layerColors);
                   const fillOpacity = ramp
                     ? ['case', ['>', ['coalesce', ['get', `int_${slug}`], 0], 0], baseOpacity, 0]

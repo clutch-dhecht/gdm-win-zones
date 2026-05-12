@@ -210,13 +210,15 @@ const MapDashboard = ({ apiUrl }) => {
       )}
 
       {/* Layer Stats */}
-      {hasData && Object.values(activeLayers).some(v => v) && (
+      {hasData && (
         <div className="px-4 py-3 border-b border-stone-100">
           <LayerStats
             activeLayers={activeLayers}
+            allLayers={allLayers}
             pointData={filteredPointData}
             locationData={filteredLocationData}
             densityData={filteredDensityData}
+            onToggle={toggleLayer}
           />
         </div>
       )}

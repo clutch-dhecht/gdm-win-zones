@@ -1,10 +1,10 @@
 // Layer configuration for GDM Win Zones
 // Edit this file to add/remove layers, change colors, enable/disable radius
 
-// Dairy ramp: light blue → mid blue → deep navy
-const DAIRY_RAMP = ['#DBEAFE', '#3B82F6', '#0A2540'];
-// Corn ramp: light yellow → lime → dark forest
-const CORN_RAMP = ['#FEF3C7', '#84CC16', '#14532D'];
+// Dairy ramp: pale → sky → bright → royal → deep navy
+const DAIRY_RAMP = ['#DBEAFE', '#7DD3FC', '#0EA5E9', '#1D4ED8', '#0A2540'];
+// Corn ramp: pale yellow → bright yellow → lime → green → dark forest
+const CORN_RAMP = ['#FEF3C7', '#FDE047', '#A3E635', '#65A30D', '#14532D'];
 
 export const LAYER_CONFIG = {
   // --- POINT LAYERS ---
