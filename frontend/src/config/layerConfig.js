@@ -1,6 +1,20 @@
 // Layer configuration for GDM Win Zones
 // Edit this file to add/remove layers, change colors, enable/disable radius
 
+// 18 states where Corn Acres is shown by default ("Key Markets" sub-filter)
+export const CORN_KEY_STATES = [
+  'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
+  'Iowa', 'Nebraska', 'Missouri', 'Indiana',
+  'Illinois', 'Ohio', 'Michigan', 'Kansas',
+  'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
+  'Pennsylvania', 'Maryland',
+];
+
+// Dairy ramp: light blue → mid blue → deep navy
+const DAIRY_RAMP = ['#DBEAFE', '#3B82F6', '#0A2540'];
+// Corn ramp: light yellow → lime → dark forest
+const CORN_RAMP = ['#FEF3C7', '#84CC16', '#14532D'];
+
 export const LAYER_CONFIG = {
   // --- POINT LAYERS ---
   "Beck's Dealers": {
@@ -13,8 +27,8 @@ export const LAYER_CONFIG = {
   "Wyffels Reps": {
     type: "point",
     radius: { enabled: true, default: 50, options: [25, 50, 100] },
-    color: "#0EA5E9",
-    markerColor: "#0EA5E9",
+    color: "#DC2626",
+    markerColor: "#DC2626",
     order: 2,
   },
 
@@ -71,25 +85,22 @@ export const LAYER_CONFIG = {
     type: "density",
     group: "dairy_cows",
     radius: { enabled: false },
-    color: "#1E3A8A",
-    fillOpacity: 0.75,
+    color: "#0A2540",
+    fillOpacity: 0.85,
+    colorRamp: DAIRY_RAMP,
     order: 56,
   },
 
-  // --- CORN ACRES (county density, restricted to 18 corn-region states) ---
+  // --- CORN ACRES (county density) ---
+  // Geo-restriction is now controlled by the "Corn Acres" sub-filter
+  // ("Key Markets" vs "All States"), wired through MapDashboard state.
   "Corn Acres": {
     type: "density",
     radius: { enabled: false },
-    color: "#16A34A",
-    fillOpacity: 0.6,
+    color: "#14532D",
+    fillOpacity: 0.85,
+    colorRamp: CORN_RAMP,
     order: 60,
-    availableStates: [
-      'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
-      'Iowa', 'Nebraska', 'Missouri', 'Indiana',
-      'Illinois', 'Ohio', 'Michigan', 'Kansas',
-      'Kentucky', 'Tennessee', 'Arkansas', 'Mississippi',
-      'Pennsylvania', 'Maryland',
-    ],
   },
 };
 

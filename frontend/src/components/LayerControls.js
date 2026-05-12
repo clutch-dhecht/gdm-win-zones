@@ -43,6 +43,8 @@ const ColorPicker = ({ color, onChange, layerName }) => {
 const LayerItem = ({ layer, isActive, onToggle, color, onColorChange, radiusSetting, onRadiusChange, hasRadius, compact = false }) => {
   // Strip group prefix for display (e.g., "FSS Grain" → "Grain", "Terminals HRW Wheat" → "HRW Wheat")
   const displayName = compact ? layer.replace(/^(FSS |Terminals |Grain )/, '') : layer;
+  const cfg = getLayerConfig(layer);
+  const hasRamp = Array.isArray(cfg.colorRamp) && cfg.colorRamp.length >= 2;
 
   return (
     <div
@@ -53,7 +55,15 @@ const LayerItem = ({ layer, isActive, onToggle, color, onColorChange, radiusSett
         className="flex items-center gap-2 py-1 cursor-pointer select-none"
         onClick={() => onToggle(layer)}
       >
-        <ColorPicker color={color} onChange={(c) => onColorChange(layer, c)} layerName={layer} />
+        {hasRamp ? (
+          <div
+            className="w-3.5 h-3.5 rounded-full flex-shrink-0 ring-1 ring-stone-300"
+            style={{ background: `linear-gradient(135deg, ${cfg.colorRamp.join(', ')})` }}
+            title="Gradient (auto-scaled to visible data)"
+          />
+        ) : (
+          <ColorPicker color={color} onChange={(c) => onColorChange(layer, c)} layerName={layer} />
+        )}
         <span className={`text-xs flex-1 ${isActive ? 'text-stone-800 font-medium' : 'text-stone-400'}`}>
           {displayName}
         </span>

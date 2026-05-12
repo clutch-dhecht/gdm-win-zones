@@ -330,9 +330,9 @@ const MapboxVisualization = ({
         const slug = slugify(layer);
         const max = layerMaxes[layer] || 1;
         const logMax = Math.log(max + 1);
+        // Sharper contrast: full 0.05–1.0 spread (was 0.2–0.8)
         let intensity = Math.log(value + 1) / logMax;
-        intensity = Math.max(intensity, 0.2);
-        intensity = Math.min(intensity * 0.75, 0.8);
+        intensity = Math.max(0.05, Math.min(1.0, intensity));
         extraProps[`val_${slug}`] = value;
         extraProps[`int_${slug}`] = intensity;
         totalAllLayers += value;
@@ -640,7 +640,7 @@ const MapboxVisualization = ({
   }, [activeLayers, layerColors]);
 
   const interactiveIds = useMemo(() => {
-    const ids = ['location-points-unclustered', 'location-clusters', 'city-markers-unclustered', 'clusters'];
+    const ids = ['location-points-unclustered', 'city-markers-unclustered'];
     activeDensityLayers.forEach(l => ids.push(`county-fill-${slugify(l)}`));
     if (winZonesEnabled) ids.push('win-zone-fill');
     return ids;
@@ -674,12 +674,21 @@ const MapboxVisualization = ({
               <Source id="counties" type="geojson" data={enrichedCountiesGeoJSON}>
                 {activeDensityLayers.map(layer => {
                   const slug = slugify(layer);
+                  const cfg = getLayerConfig(layer);
+                  const ramp = cfg.colorRamp;
+                  const baseOpacity = cfg.fillOpacity ?? 0.85;
+                  const fillColor = ramp && ramp.length >= 2
+                    ? ['interpolate', ['linear'], ['coalesce', ['get', `int_${slug}`], 0],
+                       0, ramp[0],
+                       0.5, ramp[Math.floor(ramp.length / 2)],
+                       1, ramp[ramp.length - 1]]
+                    : getDensityColor(layer, layerColors);
+                  const fillOpacity = ramp
+                    ? ['case', ['>', ['coalesce', ['get', `int_${slug}`], 0], 0], baseOpacity, 0]
+                    : ['case', ['>', ['coalesce', ['get', `int_${slug}`], 0], 0], ['get', `int_${slug}`], 0];
                   return (
                     <Layer key={`county-fill-${slug}`} id={`county-fill-${slug}`} type="fill"
-                      paint={{
-                        'fill-color': getDensityColor(layer, layerColors),
-                        'fill-opacity': ['case', ['>', ['coalesce', ['get', `int_${slug}`], 0], 0], ['get', `int_${slug}`], 0]
-                      }}
+                      paint={{ 'fill-color': fillColor, 'fill-opacity': fillOpacity }}
                     />
                   );
                 })}
@@ -819,19 +828,10 @@ const MapboxVisualization = ({
               </Source>
             )}
 
-            {/* Individual location points with clustering */}
+            {/* Individual location points (clustering disabled) */}
             {locationGeoJSON && (
-              <Source id="location-source" type="geojson" data={locationGeoJSON} cluster={true} clusterMaxZoom={8} clusterRadius={8}>
-                <Layer id="location-clusters" type="circle" filter={['has', 'point_count']} paint={{
-                  'circle-color': ['step', ['get', 'point_count'], '#57534E', 20, '#44403C', 100, '#292524', 500, '#1C1917'],
-                  'circle-radius': ['step', ['get', 'point_count'], 11, 20, 14, 100, 18, 500, 22],
-                  'circle-stroke-width': 1.5, 'circle-stroke-color': '#FFFFFF'
-                }} />
-                <Layer id="location-cluster-count" type="symbol" filter={['has', 'point_count']}
-                  layout={{ 'text-field': '{point_count_abbreviated}', 'text-size': 10, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'] }}
-                  paint={{ 'text-color': '#FFFFFF' }}
-                />
-                <Layer id="location-points-unclustered" type="circle" filter={['!', ['has', 'point_count']]} paint={{
+              <Source id="location-source" type="geojson" data={locationGeoJSON}>
+                <Layer id="location-points-unclustered" type="circle" paint={{
                   'circle-radius': 5,
                   'circle-color': locationColorExpr,
                   'circle-opacity': 0.9,
@@ -841,19 +841,10 @@ const MapboxVisualization = ({
               </Source>
             )}
 
-            {/* Aggregated city markers (CLS Customers) */}
+            {/* Aggregated city markers (clustering disabled) */}
             {cityMarkersGeoJSON && (
-              <Source id="city-markers-source" type="geojson" data={cityMarkersGeoJSON} cluster={true} clusterMaxZoom={9} clusterRadius={20}>
-                <Layer id="clusters" type="circle" filter={['has', 'point_count']} paint={{
-                  'circle-color': ['step', ['get', 'point_count'], '#0369A1', 10, '#075985', 50, '#0C4A6E'],
-                  'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 28],
-                  'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF'
-                }} />
-                <Layer id="cluster-count" type="symbol" filter={['has', 'point_count']}
-                  layout={{ 'text-field': '{point_count_abbreviated}', 'text-size': 12, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'] }}
-                  paint={{ 'text-color': '#FFFFFF' }}
-                />
-                <Layer id="city-markers-unclustered" type="circle" filter={['!', ['has', 'point_count']]} paint={{
+              <Source id="city-markers-source" type="geojson" data={cityMarkersGeoJSON}>
+                <Layer id="city-markers-unclustered" type="circle" paint={{
                   'circle-radius': ['interpolate', ['linear'], ['get', 'value'], 0, 5, 10, 7, 50, 10, 200, 14],
                   'circle-color': locationColorExpr,
                   'circle-opacity': 0.85,
