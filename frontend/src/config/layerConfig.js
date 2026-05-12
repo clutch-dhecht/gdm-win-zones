@@ -3,8 +3,10 @@
 
 // Dairy ramp: pale → sky → bright → royal → deep navy
 const DAIRY_RAMP = ['#DBEAFE', '#7DD3FC', '#0EA5E9', '#1D4ED8', '#0A2540'];
-// Corn ramp: pale yellow → bright yellow → lime → green → dark forest
-const CORN_RAMP = ['#FEF3C7', '#FDE047', '#A3E635', '#65A30D', '#14532D'];
+// Corn ramp: warm white → soft yellow → soft lime → green → dark forest
+// Low end fades toward white so the lightest counties read as "near empty"
+// and the bright yellow has more breathing room mid-low.
+const CORN_RAMP = ['#FFFBEB', '#FEF08A', '#BEF264', '#65A30D', '#14532D'];
 
 export const LAYER_CONFIG = {
   // --- POINT LAYERS ---
