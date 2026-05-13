@@ -62,7 +62,7 @@ const MapDashboard = ({ apiUrl }) => {
     setActiveLayers(newActive);
   };
 
-  const activeMarket = detectActiveMarket(activeLayers);
+  const activeMarket = detectActiveMarket(activeLayers, selectedStates);
 
   const handlePointUpload = async (file) => {
     const formData = new FormData();

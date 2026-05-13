@@ -1,5 +1,16 @@
 import React from 'react';
-import { Milk, Wheat } from 'lucide-react';
+import { Milk, Wheat, Sprout, Flame } from 'lucide-react';
+
+// AgriGold brand geography (9 states)
+const AGRIGOLD_STATES = [
+  'Michigan', 'Ohio', 'Indiana', 'Illinois', 'Missouri',
+  'Arkansas', 'Nebraska', 'Iowa', 'Kansas',
+];
+
+// Mustang brand geography (4 states)
+const MUSTANG_STATES = [
+  'North Dakota', 'South Dakota', 'Minnesota', 'Wisconsin',
+];
 
 const MARKET_PRESETS = {
   dairy: {
@@ -14,31 +25,56 @@ const MARKET_PRESETS = {
     layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres All States'],
     states: null,
   },
+  agrigold: {
+    label: 'AgriGold',
+    icon: 'agrigold',
+    layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres All States'],
+    states: AGRIGOLD_STATES,
+  },
+  mustang: {
+    label: 'Mustang',
+    icon: 'mustang',
+    layers: ["Beck's Dealers", 'Wyffels Reps', 'Corn Acres All States'],
+    states: MUSTANG_STATES,
+  },
 };
 
 export const MARKET_KEYS = Object.keys(MARKET_PRESETS);
 export const getMarketPreset = (key) => MARKET_PRESETS[key];
 
-// Given activeLayers, determine which market (if any) is selected
-export const detectActiveMarket = (activeLayers) => {
+// Compare two arrays as unordered sets
+const sameSet = (a, b) => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  const sb = new Set(b);
+  return a.every((x) => sb.has(x));
+};
+
+// Given activeLayers + the current state filter, determine which market is
+// selected. Three corn-belt presets share the same layer set, so we also
+// require the state filter to match exactly.
+export const detectActiveMarket = (activeLayers, selectedStates) => {
+  const activeNames = Object.keys(activeLayers).filter((l) => activeLayers[l]);
   for (const [key, preset] of Object.entries(MARKET_PRESETS)) {
     const presetLayers = preset.layers;
-    const activeNames = Object.keys(activeLayers).filter((l) => activeLayers[l]);
-    if (
+    const layersMatch =
       presetLayers.length === activeNames.length &&
       presetLayers.every((l) => activeLayers[l]) &&
-      activeNames.every((l) => presetLayers.includes(l))
-    ) {
-      return key;
-    }
+      activeNames.every((l) => presetLayers.includes(l));
+    if (!layersMatch) continue;
+    const presetStates = preset.states || null;
+    const currentStates = selectedStates && selectedStates.length > 0 ? selectedStates : null;
+    if (sameSet(presetStates, currentStates)) return key;
   }
-  const anyOn = Object.values(activeLayers).some((v) => v);
-  return anyOn ? 'custom' : null;
+  return activeNames.length > 0 ? 'custom' : null;
 };
 
 const MarketIcon = ({ type, className }) => {
   if (type === 'dairy') return <Milk className={className} />;
   if (type === 'corn') return <Wheat className={className} />;
+  if (type === 'agrigold') return <Sprout className={className} />;
+  if (type === 'mustang') return <Flame className={className} />;
   return null;
 };
 
