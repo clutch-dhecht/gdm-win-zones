@@ -30,6 +30,14 @@ const MapDashboard = ({ apiUrl }) => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [winClusters, setWinClusters] = useState([]);
+  const [winZoneSettings, setWinZoneSettings] = useState({
+    densityFloor: 0.6,
+    coverageRadiusMi: 30,
+    minClusterSize: 5,
+    targetZones: 19,
+  });
+  const [showWinZoneSettings, setShowWinZoneSettings] = useState(false);
   const [showZoneFocus, setShowZoneFocus] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mapZoomRef = useRef(null);
@@ -279,24 +287,52 @@ const MapDashboard = ({ apiUrl }) => {
         </div>
       )}
 
+      {/* Win Zone Settings */}
+      {hasData && winZonesMode && (
+        <div className="px-4 py-2 border-b border-stone-100">
+          <button
+            onClick={() => setShowWinZoneSettings(v => !v)}
+            className="flex items-center gap-1.5 w-full text-left py-1"
+            data-testid="win-zone-settings-toggle"
+          >
+            {showWinZoneSettings ? <ChevronDown className="w-3 h-3 text-stone-400" /> : <ChevronRight className="w-3 h-3 text-stone-400" />}
+            <span className="text-[10px] tracking-[0.08em] uppercase font-semibold text-stone-400">Win Zone Settings</span>
+          </button>
+          {showWinZoneSettings && (
+            <div className="mt-2 space-y-2.5">
+              {[
+                { key: 'densityFloor', label: 'Density Floor', min: 0.4, max: 0.9, step: 0.05, fmt: (v) => `${Math.round(v * 100)}th pctile` },
+                { key: 'coverageRadiusMi', label: 'Coverage Radius', min: 15, max: 60, step: 5, fmt: (v) => `${v} mi` },
+                { key: 'minClusterSize', label: 'Min Cluster Size', min: 3, max: 15, step: 1, fmt: (v) => `${v} counties` },
+                { key: 'targetZones', label: 'Target Zones', min: 5, max: 25, step: 1, fmt: (v) => `${v}` },
+              ].map(({ key, label, min, max, step, fmt }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-[10px] text-stone-500 w-24">{label}</span>
+                  <input
+                    type="range" min={min} max={max} step={step}
+                    value={winZoneSettings[key]}
+                    onChange={(e) => setWinZoneSettings(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
+                    className="flex-1 h-1 accent-[#0A2540]"
+                    data-testid={`wz-slider-${key}`}
+                  />
+                  <span className="text-[10px] text-stone-500 w-20 text-right">{fmt(winZoneSettings[key])}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Win Zone Cards */}
-      {hasData && winZonesMode && enrichedFeatures.length > 0 && (
+      {hasData && winZonesMode && winClusters.length > 0 && (
         <div className="px-4 py-3 border-b border-stone-100">
           <label className="text-[10px] tracking-[0.08em] uppercase font-semibold text-stone-400 block mb-2">
             {winZonesMode === 'market' ? 'Top Market Zones' : winZonesMode === 'coverage' ? 'Top Coverage Zones' : 'Top Opportunity Zones'}
           </label>
           <WinZoneCards
-            enrichedFeatures={enrichedFeatures}
-            activeLayers={activeLayers}
+            winClusters={winClusters}
             winZonesMode={winZonesMode}
-            selectedStates={selectedStates}
-            zoneFocus={zoneFocus}
-            densityData={densityData}
-            locationData={locationData}
-            pointData={pointData}
             onZoomToZone={handleZoomToZone}
-            onZonesComputed={setWinZones}
-            perRep={false}
           />
         </div>
       )}
@@ -377,6 +413,8 @@ const MapDashboard = ({ apiUrl }) => {
             onMapZoom={(fn) => { mapZoomRef.current = fn; }}
             selectedStates={selectedStates}
             hasData={hasData}
+            winZoneSettings={winZoneSettings}
+            onWinClustersComputed={setWinClusters}
           />
         </div>
       </div>

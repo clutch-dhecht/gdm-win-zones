@@ -78,6 +78,55 @@ const getCentroid = (geometry) => {
   return [sumLon / coords.length, sumLat / coords.length];
 };
 
+// Andrew's monotone chain convex hull. Input: array of [lon, lat] points.
+// Returns the hull as a closed ring [p0, p1, ..., pN, p0].
+const convexHull = (points) => {
+  if (points.length <= 1) return points.slice();
+  const pts = [...points].sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+  const cross = (O, A, B) => (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0]);
+  const lower = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  const hull = lower.concat(upper);
+  if (hull.length > 0) hull.push(hull[0]); // close ring
+  return hull;
+};
+
+// Polygon perimeter in miles (sum of haversines along the ring)
+const ringPerimeterMi = (ring) => {
+  let total = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    total += haversineLL(ring[i], ring[i + 1]);
+  }
+  return total;
+};
+
+// Polygon area in sq miles via the spherical excess approximation
+// (good enough for cluster compactness; we only use the ratio)
+const ringAreaSqMi = (ring) => {
+  if (ring.length < 4) return 0;
+  let total = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [lon1, lat1] = ring[i];
+    const [lon2, lat2] = ring[i + 1];
+    total += (lon2 - lon1) * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180));
+  }
+  const earthRSqMi = 3959 * 3959;
+  return Math.abs(total * earthRSqMi * Math.PI / 360);
+};
+
+const haversineLL = (a, b) => haversine(a[0], a[1], b[0], b[1]);
+
 const MapboxVisualization = ({
   pointData,       // aggregated (CLS Customers)
   locationData,    // individual points [{name, layer, city, state, lat, lon, address}]
@@ -94,7 +143,9 @@ const MapboxVisualization = ({
   onEnrichedFeatures,
   onMapZoom,
   selectedStates,
-  hasData
+  hasData,
+  winZoneSettings = { densityFloor: 0.6, coverageRadiusMi: 30, minClusterSize: 5, targetZones: 19 },
+  onWinClustersComputed,
 }) => {
   const [viewState, setViewState] = useState({ longitude: -97, latitude: 39, zoom: 4, pitch: 0, bearing: 0 });
   const [popupInfo, setPopupInfo] = useState(null);
@@ -410,6 +461,157 @@ const MapboxVisualization = ({
     return { type: 'FeatureCollection', features: enrichedFeatures };
   }, [countiesGeoJSON, densityData, activePointPositions, activeDensityLayers]);
 
+  // ── COUNTY ADJACENCY (precomputed once when GeoJSON loads) ──
+  // Centroid distance heuristic: two counties are "adjacent" if their centroids
+  // sit within ADJ_RADIUS_MI. Tuned for Midwest counties (~25 mi across); will
+  // miss some pairings in large western counties but those aren't where the
+  // dense corn-belt clusters live anyway.
+  const ADJ_RADIUS_MI = 55;
+  const countyAdjacency = useMemo(() => {
+    if (!enrichedCountiesGeoJSON) return null;
+    const feats = enrichedCountiesGeoJSON.features;
+    const centroids = feats.map(f => getCentroid(f.geometry));
+    const adj = feats.map(() => []);
+    for (let i = 0; i < feats.length; i++) {
+      const a = centroids[i];
+      if (!a) continue;
+      for (let j = i + 1; j < feats.length; j++) {
+        const b = centroids[j];
+        if (!b) continue;
+        // Quick bbox reject before haversine
+        if (Math.abs(a[1] - b[1]) > 1.2 || Math.abs(a[0] - b[0]) > 1.5) continue;
+        if (haversine(a[0], a[1], b[0], b[1]) <= ADJ_RADIUS_MI) {
+          adj[i].push(j);
+          adj[j].push(i);
+        }
+      }
+    }
+    return { adj, centroids };
+  }, [enrichedCountiesGeoJSON]);
+
+  // ── CLUSTER DETECTION ──
+  // Per-mode candidate filter → connected components → score → top-N clusters
+  // with convex hulls. Driven by winZonesEnabled and winZoneSettings.
+  const winClusters = useMemo(() => {
+    if (!winZonesEnabled || !hasDensityActive) return [];
+    if (!enrichedCountiesGeoJSON || !countyAdjacency) return [];
+    const { densityFloor, coverageRadiusMi, minClusterSize, targetZones } = winZoneSettings;
+    const feats = enrichedCountiesGeoJSON.features;
+    const { adj, centroids } = countyAdjacency;
+
+    // Precompute "coverage" per county: any active point within coverageRadiusMi.
+    const isCovered = feats.map((_, i) => {
+      const c = centroids[i];
+      if (!c || activePointPositions.length === 0) return false;
+      for (const p of activePointPositions) {
+        if (haversine(c[0], c[1], p[0], p[1]) <= coverageRadiusMi) return true;
+      }
+      return false;
+    });
+
+    // Density pctile per county for the active layers (max across active layers).
+    // Re-use the pre-computed int_<slug> values from enrichedCountiesGeoJSON.
+    const slugs = activeDensityLayers.map(slugify);
+    const densityPctile = feats.map(f => {
+      let max = 0;
+      for (const s of slugs) {
+        const v = f.properties[`int_${s}`] || 0;
+        if (v > max) max = v;
+      }
+      return max;
+    });
+
+    // Per-mode qualifying predicate
+    const qualifies = (i) => {
+      const f = feats[i];
+      if ((f.properties.density_total || 0) <= 0) return false;
+      if (densityPctile[i] < densityFloor) return false;
+      if (winZonesEnabled === 'opportunity') return !isCovered[i];
+      if (winZonesEnabled === 'coverage') return isCovered[i];
+      return true; // market mode: anything above the density floor
+    };
+
+    // Connected components on the qualifying subgraph
+    const seen = new Array(feats.length).fill(false);
+    const components = [];
+    for (let i = 0; i < feats.length; i++) {
+      if (seen[i] || !qualifies(i)) continue;
+      const stack = [i];
+      const comp = [];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (seen[cur]) continue;
+        seen[cur] = true;
+        comp.push(cur);
+        for (const n of adj[cur]) {
+          if (!seen[n] && qualifies(n)) stack.push(n);
+        }
+      }
+      if (comp.length >= minClusterSize) components.push(comp);
+    }
+
+    // Score each cluster: sum density × log(size+1) × compactness
+    const scored = components.map((indices) => {
+      const memberCentroids = indices.map(i => centroids[i]).filter(Boolean);
+      const hull = convexHull(memberCentroids);
+      const area = ringAreaSqMi(hull);
+      const perim = ringPerimeterMi(hull);
+      const compactness = (area > 0 && perim > 0) ? Math.min(1, (4 * Math.PI * area) / (perim * perim)) : 0.1;
+      const densitySum = indices.reduce((s, i) => s + densityPctile[i], 0);
+      const score = densitySum * Math.log(indices.length + 1) * (0.4 + 0.6 * compactness);
+      // Bounding box for zoom
+      let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+      memberCentroids.forEach(([lon, lat]) => {
+        if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+        if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+      });
+      // Counties detail for cards
+      const counties = indices.map(i => ({
+        name: feats[i].properties.NAME,
+        state: feats[i].properties.state_name,
+        density_pctile: densityPctile[i],
+        density_total: feats[i].properties.density_total,
+      })).sort((a, b) => b.density_pctile - a.density_pctile);
+      return {
+        indices,
+        hull,
+        size: indices.length,
+        compactness,
+        densitySum,
+        score,
+        bbox: { minLat: minLat - 0.4, maxLat: maxLat + 0.4, minLon: minLon - 0.4, maxLon: maxLon + 0.4 },
+        counties,
+        mode: winZonesEnabled,
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, targetZones);
+  }, [winZonesEnabled, hasDensityActive, enrichedCountiesGeoJSON, countyAdjacency, activePointPositions, activeDensityLayers, winZoneSettings]);
+
+  // Build hull GeoJSON for rendering as dashed-line + faint fill outlines
+  const winClustersGeoJSON = useMemo(() => {
+    if (!winClusters || winClusters.length === 0) return null;
+    // Cycle through 8 distinct outline colors
+    const palette = ['#0EA5E9', '#F97316', '#D946EF', '#FACC15', '#DC2626', '#1E3A8A', '#16A34A', '#0F172A'];
+    const features = winClusters.map((c, idx) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [c.hull] },
+      properties: {
+        zone_index: idx,
+        zone_color: palette[idx % palette.length],
+        size: c.size,
+        score: c.score,
+      },
+    }));
+    return { type: 'FeatureCollection', features };
+  }, [winClusters]);
+
+  // Emit clusters to parent (for WinZoneCards)
+  useEffect(() => {
+    if (onWinClustersComputed) onWinClustersComputed(winClusters);
+  }, [winClusters, onWinClustersComputed]);
+
   // Extract win zone rankings
   useEffect(() => {
     if (!onWinZoneRankings || !enrichedCountiesGeoJSON) return;
@@ -609,7 +811,7 @@ const MapboxVisualization = ({
     } else if (feature.layer.id === 'location-clusters' || feature.layer.id === 'clusters') {
       const map = mapRef.current?.getMap();
       if (map) map.easeTo({ center: feature.geometry.coordinates, zoom: viewState.zoom + 2 });
-    } else if ((feature.layer.id.startsWith('county-fill-') || feature.layer.id === 'win-zone-fill') && feature.properties.density_total > 0) {
+    } else if ((feature.layer.id.startsWith('county-fill-') || feature.layer.id === 'win-cluster-fill') && feature.properties.density_total > 0) {
       const isCov = winZonesEnabled === 'coverage';
       const isMarket = winZonesEnabled === 'market';
       const scoreProp = isCov ? feature.properties.coverage_strength : isMarket ? feature.properties.market_score : feature.properties.win_score;
@@ -644,7 +846,7 @@ const MapboxVisualization = ({
         city: feature.properties.city, state: feature.properties.state,
         layer: feature.properties.layer, value: feature.properties.value
       });
-    } else if ((feature.layer.id.startsWith('county-fill-') || feature.layer.id === 'win-zone-fill') && feature.properties.density_total > 0) {
+    } else if ((feature.layer.id.startsWith('county-fill-') || feature.layer.id === 'win-cluster-fill') && feature.properties.density_total > 0) {
       const layers = JSON.parse(feature.properties.density_layers || '{}');
       const activeParts = Object.entries(layers).filter(([l]) => activeLayers[l]).map(([l, v]) => `${l}: ${v.toLocaleString()}`).join(' | ');
       const isCov = winZonesEnabled === 'coverage';
@@ -689,7 +891,7 @@ const MapboxVisualization = ({
   const interactiveIds = useMemo(() => {
     const ids = ['location-points-unclustered', 'city-markers-unclustered'];
     activeDensityLayers.forEach(l => ids.push(`county-fill-${slugify(l)}`));
-    if (winZonesEnabled) ids.push('win-zone-fill');
+    if (winZonesEnabled) ids.push('win-cluster-fill');
     return ids;
   }, [activeDensityLayers, winZonesEnabled]);
 
@@ -749,17 +951,24 @@ const MapboxVisualization = ({
               </Source>
             )}
 
-            {/* Win Zones overlay */}
-            {winZonesEnabled && hasDensityActive && enrichedCountiesGeoJSON && (
-              <Source id="win-zones" type="geojson" data={enrichedCountiesGeoJSON}>
-                <Layer id="win-zone-fill" type="fill" paint={{
-                  'fill-color': winZonesEnabled === 'coverage'
-                    ? ['interpolate', ['linear'], ['coalesce', ['get', 'coverage_strength'], 0], 0, 'rgba(0,0,0,0)', 0.05, 'rgba(0,0,0,0)', 0.15, '#F3E8FF', 0.3, '#C084FC', 0.5, '#A855F7', 0.7, '#7E22CE', 0.9, '#581C87']
-                    : winZonesEnabled === 'market'
-                    ? ['interpolate', ['linear'], ['coalesce', ['get', 'market_score'], 0], 0, 'rgba(0,0,0,0)', 0.05, 'rgba(0,0,0,0)', 0.15, '#DCFCE7', 0.3, '#86EFAC', 0.5, '#22C55E', 0.7, '#15803D', 0.9, '#14532D']
-                    : ['interpolate', ['linear'], ['coalesce', ['get', 'win_score'], 0], 0, 'rgba(0,0,0,0)', 0.05, 'rgba(0,0,0,0)', 0.15, '#FEF3C7', 0.3, '#FBBF24', 0.5, '#F97316', 0.7, '#DC2626', 0.9, '#991B1B'],
-                  'fill-opacity': ['case', ['>', ['coalesce', ['get', winZonesEnabled === 'coverage' ? 'coverage_strength' : winZonesEnabled === 'market' ? 'market_score' : 'win_score'], 0], 0.05], 0.6, 0]
-                }} />
+            {/* Win Zones overlay — convex-hull outlines around clustered counties */}
+            {winZonesEnabled && winClustersGeoJSON && (
+              <Source id="win-clusters" type="geojson" data={winClustersGeoJSON}>
+                <Layer
+                  id="win-cluster-fill"
+                  type="fill"
+                  paint={{ 'fill-color': ['get', 'zone_color'], 'fill-opacity': 0.08 }}
+                />
+                <Layer
+                  id="win-cluster-outline"
+                  type="line"
+                  paint={{
+                    'line-color': ['get', 'zone_color'],
+                    'line-width': 2.5,
+                    'line-dasharray': [2, 2],
+                    'line-opacity': 0.9,
+                  }}
+                />
               </Source>
             )}
 
